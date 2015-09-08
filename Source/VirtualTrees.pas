@@ -53,12 +53,28 @@ interface
 
 {$booleval off} // Use fastest possible boolean evaluation
 
+{$I VTConfig.inc}
+
 // For some things to work we need code, which is classified as being unsafe for .NET.
 {$WARN UNSAFE_TYPE OFF}
 {$WARN UNSAFE_CAST OFF}
 {$WARN UNSAFE_CODE OFF}
 
-{$LEGACYIFEND ON}
+{$IF CompilerVersion >= 24}
+  {$LEGACYIFEND ON}
+{$IFEND}
+
+{$if CompilerVersion >= 21} // By Rapid D
+  {$IFDEF NO_EXTENDED_RTTI}
+    {$WEAKLINKRTTI ON}
+    {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([])}
+  {$ENDIF}
+{$ifend}
+{$if CompilerVersion >= 20}
+  {$WARN IMPLICIT_STRING_CAST       OFF}
+  {$WARN IMPLICIT_STRING_CAST_LOSS  OFF}
+{$ifend}
+
 {$WARN UNSUPPORTED_CONSTRUCT      OFF}
 
 {$HPPEMIT '#include <objidl.h>'}
@@ -70,7 +86,11 @@ interface
 uses
   Winapi.Windows, Winapi.oleacc, Winapi.Messages, System.SysUtils, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.ImgList, Winapi.ActiveX, Vcl.StdCtrls, System.Classes,
-  Vcl.Menus, Vcl.Printers, System.Types, Winapi.CommCtrl, Vcl.Themes, Winapi.UxTheme,
+  Vcl.Menus,
+{$IFDEF USE_PRINT} // By Rapid D
+  Vcl.Printers,
+{$ENDIF USE_PRINT} // By Rapid D
+  System.Types, Winapi.CommCtrl, Vcl.Themes, Winapi.UxTheme,
   Winapi.ShlObj, System.UITypes, System.Generics.Collections;
 
 const
@@ -1284,11 +1304,13 @@ type
     function InHeader(P: TPoint): Boolean; virtual;
     function InHeaderSplitterArea(P: TPoint): Boolean; virtual;
     procedure Invalidate(Column: TVirtualTreeColumn; ExpandToBorder: Boolean = False);
+ {$IFDEF USE_VT_SAVES}
     procedure LoadFromStream(const Stream: TStream); virtual;
+    procedure SaveToStream(const Stream: TStream); virtual;
+ {$ENDIF USE_VT_SAVES}
     function ResizeColumns(ChangeBy: Integer; RangeStartCol: TColumnIndex; RangeEndCol: TColumnIndex;
       Options: TVTColumnOptions = [coVisible]): Integer;
     procedure RestoreColumns;
-    procedure SaveToStream(const Stream: TStream); virtual;
 
     property DragImage: TVTDragImage read FDragImage;
     property States: THeaderStates read FStates;
@@ -1472,7 +1494,8 @@ type
     poGridLines,        // draw grid lines if enabled
     poMainOnly,         // draw only the main column
     poSelectedOnly,     // draw only selected nodes
-    poUnbuffered        // draw directly onto the target canvas; especially useful when printing
+    poUnbuffered,       // draw directly onto the target canvas; especially useful when printing
+    poPaintOnGlass      // Added by Rapid D. Paint on Glass
   );
   TVTInternalPaintOptions = set of TVTInternalPaintOption;
 
@@ -2061,11 +2084,14 @@ type
     FNextNodeToSelect: PVirtualNode;             // Next tree node that we would like to select if the current one gets deleted or looses selection for other reasons.
 
     // MSAA support
+  {$IFDEF MSAASupport} // By Rapid D
     FAccessible: IAccessible;                    // The IAccessible interface to the window itself.
     FAccessibleItem: IAccessible;                // The IAccessible to the item that currently has focus.
     FAccessibleName: string;                     // The name the window is given for screen readers.
+  {$ENDIF MSAASupport} // By Rapid D
 
     // export
+{$IFDEF USE_VST} // By Rapid D
     FOnBeforeNodeExport: TVTNodeExportEvent;     // called before exporting a node
     FOnNodeExport: TVTNodeExportEvent;
     FOnAfterNodeExport: TVTNodeExportEvent;      // called after exporting a node
@@ -2076,6 +2102,7 @@ type
     FOnAfterTreeExport: TVTTreeExportEvent;      // called after finishing the export
     FOnBeforeHeaderExport: TVTTreeExportEvent;   // called before exporting the header
     FOnAfterHeaderExport: TVTTreeExportEvent;    // called after exporting the header
+{$ENDIF USE_VST}
 
     // common events
     FOnChange: TVTChangeEvent;                   // selection change
@@ -2129,10 +2156,12 @@ type
                                                  // (see OnLoadNode) to give the application the opportunity to save
                                                  // their node specific, persistent data (note: never save memory
                                                  // references)
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     FOnLoadTree,                                 // called after the tree has been loaded from a stream to allow an
                                                  // application to load their own data saved in OnSaveTree
     FOnSaveTree: TVTSaveTreeEvent;               // called after the tree has been saved to a stream to allow an
                                                  // application to save its own data
+ {$ENDIF USE_VT_SAVES}
 
     // header/column mouse events
     FOnAfterAutoFitColumn: TVTAfterAutoFitColumnEvent;
@@ -2708,7 +2737,6 @@ type
     property Indent: Cardinal read FIndent write SetIndent default 18;
     property LastClickPos: TPoint read FLastClickPos write FLastClickPos;
     property LastDropMode: TDropMode read FLastDropMode write FLastDropMode;
-    property LastHintRect: TRect read FLastHintRect write FLastHintRect;
     property LineMode: TVTLineMode read FLineMode write SetLineMode default lmNormal;
     property LineStyle: TVTLineStyle read FLineStyle write SetLineStyle default lsDotted;
     property Margin: Integer read FMargin write SetMargin default 4;
@@ -2736,33 +2764,37 @@ type
     property OnAfterAutoFitColumn: TVTAfterAutoFitColumnEvent read FOnAfterAutoFitColumn write FOnAfterAutoFitColumn;
     property OnAfterAutoFitColumns: TVTAfterAutoFitColumnsEvent read FOnAfterAutoFitColumns write FOnAfterAutoFitColumns;
     property OnAfterCellPaint: TVTAfterCellPaintEvent read FOnAfterCellPaint write FOnAfterCellPaint;
-    property OnAfterColumnExport : TVTColumnExportEvent read FOnAfterColumnExport write FOnAfterColumnExport;
     property OnAfterColumnWidthTracking: TVTAfterColumnWidthTrackingEvent read FOnAfterColumnWidthTracking write FOnAfterColumnWidthTracking;
     property OnAfterGetMaxColumnWidth: TVTAfterGetMaxColumnWidthEvent read FOnAfterGetMaxColumnWidth write FOnAfterGetMaxColumnWidth;
-    property OnAfterHeaderExport: TVTTreeExportEvent read FOnAfterHeaderExport write FOnAfterHeaderExport;
     property OnAfterHeaderHeightTracking: TVTAfterHeaderHeightTrackingEvent read FOnAfterHeaderHeightTracking
       write FOnAfterHeaderHeightTracking;
     property OnAfterItemErase: TVTAfterItemEraseEvent read FOnAfterItemErase write FOnAfterItemErase;
     property OnAfterItemPaint: TVTAfterItemPaintEvent read FOnAfterItemPaint write FOnAfterItemPaint;
-    property OnAfterNodeExport: TVTNodeExportEvent read FOnAfterNodeExport write FOnAfterNodeExport;
     property OnAfterPaint: TVTPaintEvent read FOnAfterPaint write FOnAfterPaint;
-    property OnAfterTreeExport: TVTTreeExportEvent read FOnAfterTreeExport write FOnAfterTreeExport;
     property OnBeforeAutoFitColumn: TVTBeforeAutoFitColumnEvent read FOnBeforeAutoFitColumn write FOnBeforeAutoFitColumn;
     property OnBeforeAutoFitColumns: TVTBeforeAutoFitColumnsEvent read FOnBeforeAutoFitColumns write FOnBeforeAutoFitColumns;
     property OnBeforeCellPaint: TVTBeforeCellPaintEvent read FOnBeforeCellPaint write FOnBeforeCellPaint;
+{$IFDEF USE_VST} // By Rapid D
+    property OnAfterColumnExport : TVTColumnExportEvent read FOnAfterColumnExport write FOnAfterColumnExport;
+    property OnAfterHeaderExport: TVTTreeExportEvent read FOnBeforeHeaderExport write FOnBeforeHeaderExport;
+    property OnAfterNodeExport: TVTNodeExportEvent read FOnAfterNodeExport write FOnAfterNodeExport;
+    property OnAfterTreeExport: TVTTreeExportEvent read FOnAfterTreeExport write FOnAfterTreeExport;
     property OnBeforeColumnExport: TVTColumnExportEvent read FOnBeforeColumnExport write FOnBeforeColumnExport;
+    property OnBeforeHeaderExport: TVTTreeExportEvent read FOnBeforeHeaderExport write FOnBeforeHeaderExport;
+    property OnBeforeNodeExport: TVTNodeExportEvent read FOnBeforeNodeExport write FOnBeforeNodeExport;
+    property OnBeforeTreeExport: TVTTreeExportEvent read FOnBeforeTreeExport write FOnBeforeTreeExport;
+    property OnColumnExport : TVTColumnExportEvent read FOnColumnExport write FOnColumnExport;
+    property OnNodeExport: TVTNodeExportEvent read FOnNodeExport write FOnNodeExport;
+{$ENDIF USE_VST}
     property OnBeforeColumnWidthTracking: TVTBeforeColumnWidthTrackingEvent read FOnBeforeColumnWidthTracking
       write FOnBeforeColumnWidthTracking;
     property OnBeforeDrawTreeLine: TVTBeforeDrawLineImageEvent read FOnBeforeDrawLineImage write FOnBeforeDrawLineImage;
     property OnBeforeGetMaxColumnWidth: TVTBeforeGetMaxColumnWidthEvent read FOnBeforeGetMaxColumnWidth write FOnBeforeGetMaxColumnWidth;
-    property OnBeforeHeaderExport: TVTTreeExportEvent read FOnBeforeHeaderExport write FOnBeforeHeaderExport;
     property OnBeforeHeaderHeightTracking: TVTBeforeHeaderHeightTrackingEvent read FOnBeforeHeaderHeightTracking
       write FOnBeforeHeaderHeightTracking;
     property OnBeforeItemErase: TVTBeforeItemEraseEvent read FOnBeforeItemErase write FOnBeforeItemErase;
     property OnBeforeItemPaint: TVTBeforeItemPaintEvent read FOnBeforeItemPaint write FOnBeforeItemPaint;
-    property OnBeforeNodeExport: TVTNodeExportEvent read FOnBeforeNodeExport write FOnBeforeNodeExport;
     property OnBeforePaint: TVTPaintEvent read FOnBeforePaint write FOnBeforePaint;
-    property OnBeforeTreeExport: TVTTreeExportEvent read FOnBeforeTreeExport write FOnBeforeTreeExport;
     property OnCanSplitterResizeColumn: TVTCanSplitterResizeColumnEvent read FOnCanSplitterResizeColumn write FOnCanSplitterResizeColumn;
     property OnCanSplitterResizeHeader: TVTCanSplitterResizeHeaderEvent read FOnCanSplitterResizeHeader write FOnCanSplitterResizeHeader;
     property OnCanSplitterResizeNode: TVTCanSplitterResizeNodeEvent read FOnCanSplitterResizeNode write FOnCanSplitterResizeNode;
@@ -2773,7 +2805,6 @@ type
     property OnCollapsing: TVTChangingEvent read FOnCollapsing write FOnCollapsing;
     property OnColumnClick: TVTColumnClickEvent read FOnColumnClick write FOnColumnClick;
     property OnColumnDblClick: TVTColumnDblClickEvent read FOnColumnDblClick write FOnColumnDblClick;
-    property OnColumnExport : TVTColumnExportEvent read FOnColumnExport write FOnColumnExport;
     property OnColumnResize: TVTHeaderNotifyEvent read FOnColumnResize write FOnColumnResize;
     property OnColumnVisibilityChanged: TColumnChangeEvent read fOnColumnVisibilityChanged write fOnColumnVisibilityChanged;
     property OnColumnWidthDblClickResize: TVTColumnWidthDblClickResizeEvent read FOnColumnWidthDblClickResize
@@ -2832,8 +2863,10 @@ type
     property OnInitChildren: TVTInitChildrenEvent read FOnInitChildren write FOnInitChildren;
     property OnInitNode: TVTInitNodeEvent read FOnInitNode write FOnInitNode;
     property OnKeyAction: TVTKeyActionEvent read FOnKeyAction write FOnKeyAction;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     property OnLoadNode: TVTSaveNodeEvent read FOnLoadNode write FOnLoadNode;
     property OnLoadTree: TVTSaveTreeEvent read FOnLoadTree write FOnLoadTree;
+ {$ENDIF USE_VT_SAVES}
     property OnMeasureItem: TVTMeasureItemEvent read FOnMeasureItem write FOnMeasureItem;
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
     property OnMouseLeave: TNotifyEvent read FOnMouseLeave write FOnMouseLeave;
@@ -2841,7 +2874,6 @@ type
     property OnNodeCopied: TVTNodeCopiedEvent read FOnNodeCopied write FOnNodeCopied;
     property OnNodeCopying: TVTNodeCopyingEvent read FOnNodeCopying write FOnNodeCopying;
     property OnNodeDblClick: TVTNodeClickEvent read FOnNodeDblClick write FOnNodeDblClick;
-    property OnNodeExport: TVTNodeExportEvent read FOnNodeExport write FOnNodeExport;
     property OnNodeHeightTracking: TVTNodeHeightTrackingEvent read FOnNodeHeightTracking write FOnNodeHeightTracking;
     property OnNodeHeightDblClickResize: TVTNodeHeightDblClickResizeEvent read FOnNodeHeightDblClickResize
       write FOnNodeHeightDblClickResize;
@@ -2852,8 +2884,10 @@ type
     property OnRemoveFromSelection: TVTRemoveFromSelectionEvent read FOnRemoveFromSelection write FOnRemoveFromSelection;
     property OnRenderOLEData: TVTRenderOLEDataEvent read FOnRenderOLEData write FOnRenderOLEData;
     property OnResetNode: TVTChangeEvent read FOnResetNode write FOnResetNode;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     property OnSaveNode: TVTSaveNodeEvent read FOnSaveNode write FOnSaveNode;
     property OnSaveTree: TVTSaveTreeEvent read FOnSaveTree write FOnSaveTree;
+ {$ENDIF USE_VT_SAVES}
     property OnScroll: TVTScrollEvent read FOnScroll write FOnScroll;
     property OnShowScrollBar: TVTScrollBarShowEvent read FOnShowScrollBar write FOnShowScrollBar;
     property OnStartOperation: TVTOperationEvent read FOnStartOperation write FOnStartOperation;
@@ -2993,8 +3027,10 @@ type
     function IsEmpty: Boolean;
     function IterateSubtree(Node: PVirtualNode; Callback: TVTGetNodeProc; Data: Pointer; Filter: TVirtualNodeStates = [];
       DoInit: Boolean = False; ChildNodesOnly: Boolean = False): PVirtualNode;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     procedure LoadFromFile(const FileName: TFileName); virtual;
     procedure LoadFromStream(Stream: TStream); virtual;
+ {$ENDIF USE_VT_SAVES} // By Rapid D
     procedure MeasureItemHeight(const Canvas: TCanvas; Node: PVirtualNode); virtual;
     procedure MoveTo(Source, Target: PVirtualNode; Mode: TVTNodeAttachMode; ChildrenOnly: Boolean); overload;
     procedure MoveTo(Node: PVirtualNode; Tree: TBaseVirtualTree; Mode: TVTNodeAttachMode;
@@ -3003,7 +3039,9 @@ type
       PixelFormat: TPixelFormat = pfDevice); virtual;
     function PasteFromClipboard: Boolean; virtual;
     procedure PrepareDragImage(HotSpot: TPoint; const DataObject: IDataObject);
+{$IFDEF USE_PRINT} // By Rapid D
     procedure Print(Printer: TPrinter; PrintHeader: Boolean);
+{$ENDIF USE_PRINT} // By Rapid D
     function ProcessDrop(const DataObject: IDataObject; TargetNode: PVirtualNode; var Effect: Integer; Mode:
       TVTNodeAttachMode): Boolean;
     function ProcessOLEData(Source: TBaseVirtualTree; const DataObject: IDataObject; TargetNode: PVirtualNode;
@@ -3012,8 +3050,10 @@ type
     procedure ReinitChildren(Node: PVirtualNode; Recursive: Boolean); virtual;
     procedure ReinitNode(Node: PVirtualNode; Recursive: Boolean); virtual;
     procedure ResetNode(Node: PVirtualNode); virtual;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     procedure SaveToFile(const FileName: TFileName);
     procedure SaveToStream(Stream: TStream; Node: PVirtualNode = nil); virtual;
+ {$ENDIF USE_VT_SAVES} // By Rapid D
     function ScrollIntoView(Node: PVirtualNode; Center: Boolean; Horizontally: Boolean = False): Boolean; overload;
     function ScrollIntoView(Column: TColumnIndex; Center: Boolean): Boolean; overload;
     procedure SelectAll(VisibleOnly: Boolean);
@@ -3050,9 +3090,12 @@ type
     function VisibleChildNoInitNodes(Node: PVirtualNode; IncludeFiltered: Boolean = False): TVTVirtualNodeEnumeration;
     function VisibleNoInitNodes(Node: PVirtualNode = nil; ConsiderChildrenAbove: Boolean = True;
       IncludeFiltered: Boolean = False): TVTVirtualNodeEnumeration;
+
+  {$IFDEF MSAASupport}
     property Accessible: IAccessible read FAccessible write FAccessible;
     property AccessibleItem: IAccessible read FAccessibleItem write FAccessibleItem;
     property AccessibleName: string read FAccessibleName write FAccessibleName;
+  {$ENDIF MSAASupport}
     property BottomNode: PVirtualNode read GetBottomNode write SetBottomNode;
     property CheckedCount: Integer read GetCheckedCount;
     property CheckImages: TCustomImageList read FCheckImages;
@@ -3099,10 +3142,12 @@ type
     property VisiblePath[Node: PVirtualNode]: Boolean read GetVisiblePath write SetVisiblePath;
     property UpdateCount: Cardinal read FUpdateCount;
     property DoubleBuffered: Boolean read GetDoubleBuffered write SetDoubleBuffered default True;
+    property LastHintRect: TRect read FLastHintRect write FLastHintRect;
   end;
 
 
   // --------- TCustomVirtualStringTree
+{$IFDEF USE_VST} // By Rapid D
 
   // Options regarding strings (useful only for the string tree and descendants):
   TVTStringOption = (
@@ -3598,6 +3643,7 @@ type
     property OnGesture;
     property Touch;
   end;
+ {$ENDIF USE_VST}
 
   TVTDrawNodeEvent = procedure(Sender: TBaseVirtualTree; const PaintInfo: TVTPaintInfo) of object;
   TVTGetCellContentMarginEvent = procedure(Sender: TBaseVirtualTree; HintCanvas: TCanvas; Node: PVirtualNode;
@@ -3717,30 +3763,34 @@ type
     property OnAfterAutoFitColumn;
     property OnAfterAutoFitColumns;
     property OnAfterCellPaint;
+ {$IFDEF USE_VST}
     property OnAfterColumnExport;
+    property OnAfterHeaderExport;
+    property OnAfterNodeExport;
+    property OnAfterTreeExport;
+    property OnBeforeColumnExport;
+    property OnBeforeHeaderExport;
+    property OnBeforeNodeExport;
+    property OnBeforeTreeExport;
+    property OnColumnExport;
+    property OnNodeExport;
+ {$ENDIF USE_VST}
     property OnAfterColumnWidthTracking;
     property OnAfterGetMaxColumnWidth;
-    property OnAfterHeaderExport;
     property OnAfterHeaderHeightTracking;
     property OnAfterItemErase;
     property OnAfterItemPaint;
-    property OnAfterNodeExport;
     property OnAfterPaint;
-    property OnAfterTreeExport;
     property OnBeforeAutoFitColumn;
     property OnBeforeAutoFitColumns;
     property OnBeforeCellPaint;
-    property OnBeforeColumnExport;
     property OnBeforeColumnWidthTracking;
     property OnBeforeDrawTreeLine;
     property OnBeforeGetMaxColumnWidth;
-    property OnBeforeHeaderExport;
     property OnBeforeHeaderHeightTracking;
     property OnBeforeItemErase;
     property OnBeforeItemPaint;
-    property OnBeforeNodeExport;
     property OnBeforePaint;
-    property OnBeforeTreeExport;
     property OnCanSplitterResizeColumn;
     property OnCanSplitterResizeHeader;
     property OnCanSplitterResizeNode;
@@ -3752,7 +3802,6 @@ type
     property OnCollapsing;
     property OnColumnClick;
     property OnColumnDblClick;
-    property OnColumnExport;
     property OnColumnResize;
     property OnColumnWidthDblClickResize;
     property OnColumnWidthTracking;
@@ -3812,8 +3861,10 @@ type
     property OnKeyDown;
     property OnKeyPress;
     property OnKeyUp;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     property OnLoadNode;
     property OnLoadTree;
+ {$ENDIF USE_VT_SAVES} // By Rapid D
     property OnMeasureItem;
     property OnMouseDown;
     property OnMouseMove;
@@ -3823,7 +3874,6 @@ type
     property OnNodeCopied;
     property OnNodeCopying;
     property OnNodeDblClick;
-    property OnNodeExport;
     property OnNodeHeightTracking;
     property OnNodeHeightDblClickResize;
     property OnNodeMoved;
@@ -3834,8 +3884,10 @@ type
     property OnRenderOLEData;
     property OnResetNode;
     property OnResize;
+ {$IFDEF USE_VT_SAVES} // By Rapid D
     property OnSaveNode;
     property OnSaveTree;
+ {$ENDIF USE_VT_SAVES} // By Rapid D
     property OnScroll;
     property OnShowScrollBar;
     property OnStartDock;
@@ -3879,7 +3931,10 @@ uses
   VirtualTrees.Classes,
   VirtualTrees.WorkerThread,
   VirtualTrees.ClipBoard,
-  VirtualTrees.Utils, VTHeaderPopup, VirtualTrees.Export;
+{$IFDEF USE_VST} // By Rapid D
+  VirtualTrees.Export,
+{$ENDIF USE_VST} // By Rapid D
+  VirtualTrees.Utils, VTHeaderPopup;
 
 
 resourcestring
@@ -4103,7 +4158,9 @@ var
   MaskColor: TColor;
   Source,
   Dest: TRect;
-
+ {$IFDEF DELPHI_9_UP}// By Rapid D
+  a: Integer;
+ {$ENDIF DELPHI_9_UP}
 begin
   Watcher.Enter;
   try
@@ -4121,10 +4178,16 @@ begin
         Exit;// This should never happen, it prevents a division by zero exception below in the for loop, which we have seen in a few cases
       // It is assumed that the image height determines also the width of one entry in the image list.
       IL.Clear;
+    {$IFDEF DELPHI_9_UP}// By Rapid D
+      a := Images.Height;
+      IL.SetSize(a, a); // By Rapid D
+      OneImage.SetSize(a, a); // By Rapid D
+    {$ELSE DELPHI_9_dn}
       IL.Height := Images.Height;
       IL.Width := Images.Height;
       OneImage.Width := IL.Width;
       OneImage.Height := IL.Height;
+    {$ENDIF DELPHI_9_UP}
       MaskColor := Images.Canvas.Pixels[0, 0]; // this is usually clFuchsia
       Dest := Rect(0, 0, IL.Width, IL.Height);
       for I := 0 to (Images.Width div Images.Height) - 1 do
@@ -4232,8 +4295,12 @@ begin
   BM := TBitmap.Create;
   try
     // Make the bitmap the same size as the image list is to avoid problems when adding.
+   {$IFDEF DELPHI_9_UP}// By Rapid D
+    BM.SetSize(IL.Width, IL.Height); // By Rapid D
+   {$ELSE DELPHI_9_dn}
     BM.Width := IL.Width;
     BM.Height := IL.Height;
+   {$ENDIF DELPHI_9_UP}// By Rapid D
     BM.Canvas.Brush.Color := MaskColor;
     BM.Canvas.Brush.Style := bsSolid;
     BM.Canvas.FillRect(Rect(0, 0, BM.Width, BM.Height));
@@ -4328,6 +4395,7 @@ begin
   // OLEFlushClipboard is used. Hence it is disabled until somebody finds a solution.
   CF_VIRTUALTREE := RegisterVTClipboardFormat(CFSTR_VIRTUALTREE, TBaseVirtualTree, 50, TYMED_HGLOBAL {or TYMED_ISTREAM});
   // Specialized string tree formats.
+ {$IFDEF USE_VST}
   CF_HTML := RegisterVTClipboardFormat(CFSTR_HTML, TCustomVirtualStringTree, 80);
   CF_VRTFNOOBJS := RegisterVTClipboardFormat(CFSTR_RTFNOOBJS, TCustomVirtualStringTree, 84);
   CF_VRTF := RegisterVTClipboardFormat(CFSTR_RTF, TCustomVirtualStringTree, 85);
@@ -4335,6 +4403,7 @@ begin
   // Predefined clipboard formats. Just add them to the internal list.
   RegisterVTClipboardFormat(CF_TEXT, TCustomVirtualStringTree, 100);
   RegisterVTClipboardFormat(CF_UNICODETEXT, TCustomVirtualStringTree, 95);
+ {$ENDIF USE_VST}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -5713,22 +5782,34 @@ begin
       Rect.Left := Screen.DesktopLeft + Screen.DesktopLeft;
 
     // adjust sizes of bitmaps
+    FDrawBuffer.Height := 0;
+    FBackground.Height := 0;
+    FTarget.Height := 0;
+   {$IFDEF DELPHI_9_UP}// By Rapid D
+    FDrawBuffer.SetSize(Width, Height);  // By Rapid D
+    FBackground.SetSize(Width, Height);  // By Rapid D
+    FTarget.SetSize(Width, Height);      // By Rapid D
+   {$ELSE DELPHI_9_dn}
     FDrawBuffer.Width := Width;
     FDrawBuffer.Height := Height;
     FBackground.Width := Width;
     FBackground.Height := Height;
     FTarget.Width := Width;
     FTarget.Height := Height;
+   {$ENDIF DELPHI_9_UP}// By Rapid D
 
     FHintData.Tree.Update;
 
-    // capture screen
-    DC := GetDC(0);
-    try
+    if not (FHintData.Tree.DoGetAnimationType in [hatNone, hatSystemDefault]) then // Added By Rapid D
+    begin
+      // capture screen
+      DC := GetDC(0);
+      try
       with TWithSafeRect(Rect) do
-        BitBlt(FBackground.Canvas.Handle, 0, 0, Width, Height, DC, Left, Top, SRCCOPY);
-    finally
-      ReleaseDC(0, DC);
+          BitBlt(FBackground.Canvas.Handle, 0, 0, Width, Height, DC, Left, Top, SRCCOPY);
+      finally
+        ReleaseDC(0, DC);
+      end;
     end;
 
     SetWindowPos(Handle, HWND_TOPMOST, Rect.Left, Rect.Top, Width, Height, SWP_SHOWWINDOW or SWP_NOACTIVATE);
@@ -5781,7 +5862,7 @@ begin
 
     with FHintData do
     begin
-      // The draw tree gets its hint size by the application (but only if not a header hint is about to show).      // If the user will be drawing the hint, it gets its hint size by the application
+      // The draw tree gets its hint size by the application
       // (but only if not a header hint is about to show).
       // This size has already been determined in CMHintShow.
       if Assigned(Node) and (not IsRectEmpty(HintRect)) then
@@ -5807,9 +5888,11 @@ begin
         else
         begin
           Canvas.Font := Tree.Font;
+ {$IFDEF USE_VST}
           if Tree is TCustomVirtualStringTree then
             with TCustomVirtualStringTree(Tree) do
               DoPaintText(Node, Self.Canvas, Column, ttNormal);
+ {$ENDIF USE_VST}
         end;
 
         GetTextMetrics(Canvas.Handle, TM);
@@ -6299,18 +6382,26 @@ begin
 
     FDragImage := TBitmap.Create;
     FDragImage.PixelFormat := pf32Bit;
-    FDragImage.Width := Width;
-    FDragImage.Height := Height;
 
     FAlphaImage := TBitmap.Create;
     FAlphaImage.PixelFormat := pf32Bit;
-    FAlphaImage.Width := Width;
-    FAlphaImage.Height := Height;
 
     FBackImage := TBitmap.Create;
     FBackImage.PixelFormat := pf32Bit;
+
+   {$IFDEF DELPHI_9_UP}// By Rapid D
+    FDragImage.SetSize(Width, Height);  // By Rapid D
+    FAlphaImage.SetSize(Width, Height);  // By Rapid D
+    FBackImage.SetSize(Width, Height);  // By Rapid D
+   {$ELSE DELPHI_9_dn}
+    FDragImage.Width := Width;
+    FDragImage.Height := Height;
+    FAlphaImage.Width := Width;
+    FAlphaImage.Height := Height;
     FBackImage.Width := Width;
     FBackImage.Height := Height;
+   {$ENDIF DELPHI_9_UP}// By Rapid D
+
 
     // Copy the given drag image and apply pre blend bias if required.
     if FPreBlendBias = 0 then
@@ -10893,8 +10984,13 @@ begin
   with Image do
   try
     PixelFormat := pf32Bit;
+   {$IFDEF DELPHI_9_UP}// By Rapid D
+    SetSize(DragColumn.Width, FHeight);  // By Rapid D
+   {$ELSE DELPHI_9_dn}
     Width := DragColumn.Width;
     Height := FHeight;
+   {$ENDIF DELPHI_9_UP}// By Rapid D
+
 
     // Erase the entire image with the color key value, for the case not everything
     // in the image is covered by the header image.
@@ -11355,6 +11451,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+ {$IFDEF USE_VT_SAVES}
 procedure TVTHeader.LoadFromStream(const Stream: TStream);
 
 // restore the state of the header from the given stream
@@ -11453,6 +11550,94 @@ begin
     Treeview.DoColumnResize(NoColumn);
   end;
 end;
+
+//----------------------------------------------------------------------------------------------------------------------
+
+procedure TVTHeader.SaveToStream(const Stream: TStream);
+
+// Saves the complete state of the header into the provided stream.
+
+var
+  Dummy: Integer;
+  Tmp: AnsiString;
+
+begin
+  with Stream do
+  begin
+    // In previous version of VT was no header stream version defined.
+    // For feature enhancements it is necessary, however, to know which stream
+    // format we are trying to load.
+    // In order to distict from non-version streams an indicator is inserted.
+    Dummy := -1;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    // Write current stream version number, nothing more is required at the time being.
+    Dummy := VTHeaderStreamVersion;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+
+    // Save columns in case they depend on certain options (like auto size).
+    Columns.SaveToStream(Stream);
+
+    Dummy := FAutoSizeIndex;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := FBackground;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := FHeight;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := Integer(FOptions);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    // PopupMenu is neither saved nor restored
+    Dummy := Ord(FStyle);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    // TFont has no own save routine so we do it manually
+    with Font do
+    begin
+      Dummy := Color;
+      WriteBuffer(Dummy, SizeOf(Dummy));
+
+      // Need only to write one: size or height, I decided to write height.
+      Dummy := Height;
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      Tmp := UTF8Encode(Name);
+      Dummy := Length(Tmp);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      WriteBuffer(PAnsiChar(Tmp)^, Dummy);
+      Dummy := Ord(Pitch);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      Dummy := Byte(Style);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+    end;
+
+    // Data introduced by stream version 1.
+    Dummy := FMainColumn;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := FSortColumn;
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := Byte(FSortDirection);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+
+    // Data introduced by stream version 5.
+    Dummy := Integer(ParentFont);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := Integer(FMaxHeight);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := Integer(FMinHeight);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    Dummy := Integer(FDefaultHeight);
+    WriteBuffer(Dummy, SizeOf(Dummy));
+    with FFixedAreaConstraints do
+    begin
+      Dummy := Integer(FMaxHeightPercent);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      Dummy := Integer(FMaxWidthPercent);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      Dummy := Integer(FMinHeightPercent);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+      Dummy := Integer(FMinWidthPercent);
+      WriteBuffer(Dummy, SizeOf(Dummy));
+    end
+  end;
+end;
+ {$ENDIF USE_VT_SAVES}
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -11636,93 +11821,6 @@ begin
     for I := Count - 1 downto 0 do
       if [coResizable, coVisible] * Items[FPositionToIndex[I]].FOptions = [coResizable, coVisible] then
         Items[I].RestoreLastWidth;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TVTHeader.SaveToStream(const Stream: TStream);
-
-// Saves the complete state of the header into the provided stream.
-
-var
-  Dummy: Integer;
-  Tmp: AnsiString;
-
-begin
-  with Stream do
-  begin
-    // In previous version of VT was no header stream version defined.
-    // For feature enhancements it is necessary, however, to know which stream
-    // format we are trying to load.
-    // In order to distict from non-version streams an indicator is inserted.
-    Dummy := -1;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    // Write current stream version number, nothing more is required at the time being.
-    Dummy := VTHeaderStreamVersion;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-
-    // Save columns in case they depend on certain options (like auto size).
-    Columns.SaveToStream(Stream);
-
-    Dummy := FAutoSizeIndex;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := FBackgroundColor;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := FHeight;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := Integer(FOptions);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    // PopupMenu is neither saved nor restored
-    Dummy := Ord(FStyle);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    // TFont has no own save routine so we do it manually
-    with Font do
-    begin
-      Dummy := Color;
-      WriteBuffer(Dummy, SizeOf(Dummy));
-
-      // Need only to write one: size or height, I decided to write height.
-      Dummy := Height;
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      Tmp := UTF8Encode(Name);
-      Dummy := Length(Tmp);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      WriteBuffer(PAnsiChar(Tmp)^, Dummy);
-      Dummy := Ord(Pitch);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      Dummy := Byte(Style);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-    end;
-
-    // Data introduced by stream version 1.
-    Dummy := FMainColumn;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := FSortColumn;
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := Byte(FSortDirection);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-
-    // Data introduced by stream version 5.
-    Dummy := Integer(ParentFont);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := Integer(FMaxHeight);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := Integer(FMinHeight);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := Integer(FDefaultHeight);
-    WriteBuffer(Dummy, SizeOf(Dummy));
-    with FFixedAreaConstraints do
-    begin
-      Dummy := Integer(FMaxHeightPercent);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      Dummy := Integer(FMaxWidthPercent);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      Dummy := Integer(FMinHeightPercent);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-      Dummy := Integer(FMinWidthPercent);
-      WriteBuffer(Dummy, SizeOf(Dummy));
-    end;
-  end;
 end;
 
 //----------------- TScrollBarOptions ----------------------------------------------------------------------------------
@@ -16365,6 +16463,7 @@ end;
 procedure TBaseVirtualTree.WMGetObject(var Message: TMessage);
 
 begin
+ {$IFDEF MSAASupport}
   if TVTAccessibilityFactory.GetAccessibilityFactory <> nil then
   begin
     // Create the IAccessibles for the tree view and tree view items, if necessary.
@@ -16378,6 +16477,7 @@ begin
       else
         Message.Result := 0;
   end;
+ {$ENDIF MSAASupport}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -19286,8 +19386,10 @@ procedure TBaseVirtualTree.DoChecked(Node: PVirtualNode);
 begin
   if Assigned(FOnChecked) then
     FOnChecked(Self, Node);
+ {$IFDEF MSAASupport}
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
+ {$ENDIF MSAASupport}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -19317,9 +19419,10 @@ begin
   if Assigned(FOnCollapsed) then
     FOnCollapsed(Self, Node);
 
+ {$IFDEF MSAASupport}
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
-
+ {$ENDIF MSAASupport}
   if (toAlwaysSelectNode in TreeOptions.SelectionOptions) then
   begin
     // Select the next visible parent if the currently selected node gets invisible due to a collapse
@@ -19707,8 +19810,10 @@ begin
   if Assigned(FOnExpanded) then
     FOnExpanded(Self, Node);
 
+ {$IFDEF MSAASupport}
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
+ {$ENDIF MSAASupport}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -19729,6 +19834,7 @@ begin
   if Assigned(FOnFocusChanged) then
     FOnFocusChanged(Self, Node, Column);
 
+ {$IFDEF MSAASupport}
   if Assigned(FAccessibleItem) then
   begin
     NotifyWinEvent(EVENT_OBJECT_LOCATIONCHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
@@ -19738,6 +19844,7 @@ begin
     NotifyWinEvent(EVENT_OBJECT_SELECTION, Handle, OBJID_CLIENT, CHILDID_SELF);
     NotifyWinEvent(EVENT_OBJECT_FOCUS, Handle, OBJID_CLIENT, CHILDID_SELF);
   end;
+ {$ENDIF MSAASupport}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -23282,8 +23389,10 @@ procedure TBaseVirtualTree.MainColumnChanged;
 begin
   DoCancelEdit;
 
+ {$IFDEF MSAASupport}
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
+ {$ENDIF MSAASupport}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -29677,6 +29786,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+ {$IFDEF USE_VT_SAVES} // By Rapid D
 procedure TBaseVirtualTree.LoadFromFile(const FileName: TFileName);
 
 var
@@ -29747,6 +29857,7 @@ begin
       ShowError(SWrongStreamFormat, hcTFWrongStreamFormat);
   end;
 end;
+ {$ENDIF USE_VT_SAVES} // By Rapid D
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -30488,8 +30599,13 @@ begin
             // Avoid unnecessary copying of bitmap content. This will destroy the DC handle too.
             NodeBitmap.Height := 0;
             NodeBitmap.PixelFormat := pf32Bit;
+         {$IFDEF DELPHI_9_UP}// By Rapid D
+          NodeBitmap.SetSize(TargetRect.Right - TargetRect.Left,
+                         TargetRect.Bottom - TargetRect.Top); // By Rapid D
+         {$ELSE DELPHI_9_dn}
             NodeBitmap.Width := TargetRect.Right - TargetRect.Left;
             NodeBitmap.Height := TargetRect.Bottom - TargetRect.Top;
+         {$ENDIF DELPHI_9_UP}// By Rapid D
           end;
 
           // Call back application/descendants whether they want to erase this area.
@@ -30746,7 +30862,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
+{$IFDEF USE_PRINT}
 procedure TBaseVirtualTree.Print(Printer: TPrinter; PrintHeader: Boolean);
 
 var
@@ -30897,7 +31013,7 @@ begin
     end;
   end;
 end;
-
+{$ENDIF USE_PRINT}
 //----------------------------------------------------------------------------------------------------------------------
 
 function TBaseVirtualTree.ProcessDrop(const DataObject: IDataObject; TargetNode: PVirtualNode; var Effect: Integer;
@@ -31235,6 +31351,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
+ {$IFDEF USE_VT_SAVES} // By Rapid D
 
 procedure TBaseVirtualTree.SaveToFile(const FileName: TFileName);
 
@@ -31295,6 +31412,7 @@ begin
     FOnSaveTree(Self, Stream);
 end;
 
+ {$ENDIF USE_VT_SAVES} // By Rapid D
 //----------------------------------------------------------------------------------------------------------------------
 
 function TBaseVirtualTree.ScrollIntoView(Node: PVirtualNode; Center: Boolean; Horizontally: Boolean = False): Boolean;
@@ -32409,6 +32527,7 @@ begin
 end;
 
 //----------------- TCustomStringTreeOptions ---------------------------------------------------------------------------
+ {$IFDEF USE_VST}
 
 constructor TCustomStringTreeOptions.Create(AOwner: TBaseVirtualTree);
 
@@ -34233,6 +34352,10 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+ {$ENDIF USE_VST} // Added by Rapid D
+
+//----------------------------------------------------------------------------------------------------------------------
+
 function TCustomVirtualDrawTree.DoGetCellContentMargin(Node: PVirtualNode; Column: TColumnIndex;
   CellContentMarginType: TVTCellContentMarginType = ccmtAllSides; Canvas: TCanvas = nil): TPoint;
 
@@ -34372,12 +34495,14 @@ end;
 
 { TVSTGetCellTextEventArgs }
 
+{$IFDEF USE_VST} // By Rapid D
 constructor TVSTGetCellTextEventArgs.Create(pNode: PVirtualNode; pColumn: TColumnIndex; pExportType: TVTExportType);
 begin
   Self.Node := pNode;
   Self.Column := pColumn;
   Self.ExportType := pExportType;
 end;
+{$ENDIF USE_VST} // By Rapid D
 
 initialization
   // This watcher is used whenever a global structure could be modified by more than one thread.

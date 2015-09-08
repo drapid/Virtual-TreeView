@@ -379,8 +379,11 @@ end;
 procedure Register;
 
 begin
-  RegisterComponents('Virtual Controls', [TVirtualStringTree, TVirtualDrawTree, TVTHeaderPopupMenu]);
+  RegisterComponents('Virtual Controls', [{$IFDEF USE_VST}TVirtualStringTree, {$ENDIF USE_VST}
+                                 TVirtualDrawTree, TVTHeaderPopupMenu]);
+{$IFDEF USE_VST} // By Rapid D
   RegisterComponentEditor(TVirtualStringTree, TVirtualTreeEditor);
+{$ENDIF USE_VST} // By Rapid D
   RegisterComponentEditor(TVirtualDrawTree, TVirtualTreeEditor);
   RegisterPropertyEditor(TypeInfo(TClipboardFormats), nil, '', TClipboardFormatsProperty);
   RegisterPropertyEditor(TypeInfo(TCheckImageKind), nil, '', TCheckImageKindProperty);  

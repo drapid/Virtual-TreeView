@@ -25,6 +25,8 @@ unit VirtualTrees.StyleHooks;
 
 interface
 
+{$I VTConfig.inc}
+
 {$WARN UNSAFE_TYPE OFF}
 {$WARN UNSAFE_CAST OFF}
 {$WARN UNSAFE_CODE OFF}
@@ -1141,7 +1143,9 @@ end;
 
 initialization
 
+{$IFDEF USE_VST} // By Rapid D
   TCustomStyleEngine.RegisterStyleHook(TVirtualStringTree, TVclStyleScrollBarsHook);
+{$ENDIF USE_VST} // By Rapid D
   TCustomStyleEngine.RegisterStyleHook(TVirtualDrawTree, TVclStyleScrollBarsHook);
 
 end.

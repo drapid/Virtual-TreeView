@@ -80,6 +80,7 @@ function OrderRect(const R: TRect): TRect;
 // (used in DragMove of the drag manager and DragTo of the header columns).
 procedure FillDragRectangles(DragWidth, DragHeight, DeltaX, DeltaY: Integer; var RClip, RScroll, RSamp1, RSamp2, RDraw1, RDraw2: TRect);
 
+procedure SetCurrentThreadName(const Name: Ansistring); // By Rapid D
 
 
 implementation
@@ -1279,5 +1280,39 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+
+{
+  function IfThen(AValue: Boolean; const ATrue: Integer; const AFalse: Integer = 0): Integer;
+  begin
+    if AValue then
+      Result := ATrue
+    else
+      Result := AFalse;
+  end;
+}
+procedure SetCurrentThreadName(const Name: Ansistring); // By Rapid D
+type
+  TThreadNameInfo =
+    record
+      RecType: LongWord;
+      Name: PAnsiChar;
+      ThreadID: LongWord;
+      Flags: LongWord;
+    end;
+var
+  info:TThreadNameInfo;
+begin
+  // This code is extremely strange, but it's the documented way of doing it!
+  info.RecType:=$1000;
+  info.Name:=PAnsiChar(Name);
+  info.ThreadID:=$FFFFFFFF;
+  info.Flags:=0;
+  try
+    RaiseException($406D1388, 0,
+      SizeOf(info) div SizeOf(LongWord), PUINT_PTR(@info));
+//      SizeOf(info) div SizeOf(LongWord), PDWORD(@info));
+  except
+  end;
+end;
 
 end.
