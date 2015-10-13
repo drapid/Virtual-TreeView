@@ -94,7 +94,7 @@ uses
   Winapi.ShlObj, System.UITypes, System.Generics.Collections;
 
 const
-  VTVersion = '6.1.0';
+  VTVersion = '6.2.0';
 
 const
   VTTreeStreamVersion = 2;
@@ -242,7 +242,8 @@ type
     vsMultiline,         // Node text is wrapped at the cell boundaries instead of being shorted.
     vsHeightMeasured,    // Node height has been determined and does not need a recalculation.
     vsToggling,          // Set when a node is expanded/collapsed to prevent recursive calls.
-    vsFiltered           // Indicates that the node should not be painted (without effecting its children).
+    vsFiltered,          // Indicates that the node should not be painted (without effecting its children).
+    vsInitializing       // Set when the node is being initialized
   );
   TVirtualNodeStates = set of TVirtualNodeState;
 
@@ -633,7 +634,7 @@ type
   public
     function IsAssigned(): Boolean; inline;
     function GetData(): Pointer; overload; inline;
-    function GetData<T:class>(): T; overload; inline;
+    function GetData<T>(): T; overload; inline;
     procedure SetData(pUserData: Pointer); overload;
     procedure SetData<T:class>(pUserData: T); overload;
     procedure SetData(const pUserData: IInterface); overload;
@@ -1304,7 +1305,7 @@ type
     function InHeader(P: TPoint): Boolean; virtual;
     function InHeaderSplitterArea(P: TPoint): Boolean; virtual;
     procedure Invalidate(Column: TVirtualTreeColumn; ExpandToBorder: Boolean = False);
- {$IFDEF USE_VT_SAVES}
+{$IFDEF USE_VT_SAVES} // By Rapid D
     procedure LoadFromStream(const Stream: TStream); virtual;
     procedure SaveToStream(const Stream: TStream); virtual;
  {$ENDIF USE_VT_SAVES}
@@ -2688,7 +2689,7 @@ type
     procedure WriteChunks(Stream: TStream; Node: PVirtualNode); virtual;
     procedure WriteNode(Stream: TStream; Node: PVirtualNode); virtual;
 
-    procedure VclStyleChanged;
+    procedure VclStyleChanged; virtual;
     property VclStyleEnabled: Boolean read FVclStyleEnabled;
     property TotalInternalDataSize: Cardinal read FTotalInternalDataSize;
 
@@ -2989,7 +2990,8 @@ type
     function GetNodeAt(X, Y: Integer): PVirtualNode; overload;
     function GetNodeAt(X, Y: Integer; Relative: Boolean; var NodeTop: Integer): PVirtualNode; overload;
     function GetNodeData(Node: PVirtualNode): Pointer; overload;
-    function GetNodeData<T:class>(pNode: PVirtualNode): T; overload; inline;
+    function GetNodeData<T>(pNode: PVirtualNode): T; overload; inline;
+    function GetSelectedData<T>(): TArray<T>; overload;
     function GetInterfaceFromNodeData<T:IInterface>(pNode: PVirtualNode): T; overload; inline;
     function GetNodeDataAt<T:class>(pXCoord: Integer; pYCoord: Integer): T;
     function GetFirstSelectedNodeData<T:class>(): T;
@@ -3091,7 +3093,7 @@ type
     function VisibleNoInitNodes(Node: PVirtualNode = nil; ConsiderChildrenAbove: Boolean = True;
       IncludeFiltered: Boolean = False): TVTVirtualNodeEnumeration;
 
-  {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
     property Accessible: IAccessible read FAccessible write FAccessible;
     property AccessibleItem: IAccessible read FAccessibleItem write FAccessibleItem;
     property AccessibleName: string read FAccessibleName write FAccessibleName;
@@ -3400,6 +3402,7 @@ type
     property Text[Node: PVirtualNode; Column: TColumnIndex]: string read GetText write SetText;
   end;
 
+  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
   TVirtualStringTree = class(TCustomVirtualStringTree)
   private
    
@@ -3538,6 +3541,7 @@ type
     property OnColumnDblClick;
     property OnColumnExport;
     property OnColumnResize;
+    property OnColumnVisibilityChanged;
     property OnColumnWidthDblClickResize;
     property OnColumnWidthTracking;
     property OnCompareNodes;
@@ -3669,6 +3673,7 @@ type
     property OnGetNodeWidth: TVTGetNodeWidthEvent read FOnGetNodeWidth write FOnGetNodeWidth;
   end;
 
+  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
   TVirtualDrawTree = class(TCustomVirtualDrawTree)
   private
     function GetOptions: TVirtualTreeOptions;
@@ -3803,6 +3808,7 @@ type
     property OnColumnClick;
     property OnColumnDblClick;
     property OnColumnResize;
+    property OnColumnVisibilityChanged;
     property OnColumnWidthDblClickResize;
     property OnColumnWidthTracking;
     property OnCompareNodes;
@@ -4158,9 +4164,7 @@ var
   MaskColor: TColor;
   Source,
   Dest: TRect;
- {$IFDEF DELPHI_9_UP}// By Rapid D
-  a: Integer;
- {$ENDIF DELPHI_9_UP}
+  a: Integer; // By Rapid D
 begin
   Watcher.Enter;
   try
@@ -4178,16 +4182,9 @@ begin
         Exit;// This should never happen, it prevents a division by zero exception below in the for loop, which we have seen in a few cases
       // It is assumed that the image height determines also the width of one entry in the image list.
       IL.Clear;
-    {$IFDEF DELPHI_9_UP}// By Rapid D
-      a := Images.Height;
+      a := Images.Height; // By Rapid D
       IL.SetSize(a, a); // By Rapid D
       OneImage.SetSize(a, a); // By Rapid D
-    {$ELSE DELPHI_9_dn}
-      IL.Height := Images.Height;
-      IL.Width := Images.Height;
-      OneImage.Width := IL.Width;
-      OneImage.Height := IL.Height;
-    {$ENDIF DELPHI_9_UP}
       MaskColor := Images.Canvas.Pixels[0, 0]; // this is usually clFuchsia
       Dest := Rect(0, 0, IL.Width, IL.Height);
       for I := 0 to (Images.Width div Images.Height) - 1 do
@@ -4295,12 +4292,7 @@ begin
   BM := TBitmap.Create;
   try
     // Make the bitmap the same size as the image list is to avoid problems when adding.
-   {$IFDEF DELPHI_9_UP}// By Rapid D
     BM.SetSize(IL.Width, IL.Height); // By Rapid D
-   {$ELSE DELPHI_9_dn}
-    BM.Width := IL.Width;
-    BM.Height := IL.Height;
-   {$ENDIF DELPHI_9_UP}// By Rapid D
     BM.Canvas.Brush.Color := MaskColor;
     BM.Canvas.Brush.Style := bsSolid;
     BM.Canvas.FillRect(Rect(0, 0, BM.Width, BM.Height));
@@ -4395,7 +4387,7 @@ begin
   // OLEFlushClipboard is used. Hence it is disabled until somebody finds a solution.
   CF_VIRTUALTREE := RegisterVTClipboardFormat(CFSTR_VIRTUALTREE, TBaseVirtualTree, 50, TYMED_HGLOBAL {or TYMED_ISTREAM});
   // Specialized string tree formats.
- {$IFDEF USE_VST}
+{$IFDEF USE_VST} // By Rapid D
   CF_HTML := RegisterVTClipboardFormat(CFSTR_HTML, TCustomVirtualStringTree, 80);
   CF_VRTFNOOBJS := RegisterVTClipboardFormat(CFSTR_RTFNOOBJS, TCustomVirtualStringTree, 84);
   CF_VRTF := RegisterVTClipboardFormat(CFSTR_RTF, TCustomVirtualStringTree, 85);
@@ -4520,6 +4512,14 @@ begin
             RecreateWnd;
           if toAcceptOLEDrop in ToBeSet then
             RegisterDragDrop(Handle, DragManager as IDropTarget);
+          if toVariableNodeHeight in ToBeSet then begin
+            BeginUpdate();
+            try
+              ReInitNode(nil, True);
+            finally
+              EndUpdate();
+            end;//try..finally
+          end;//if toVariableNodeHeight
         end;
       end;
   end;
@@ -5785,18 +5785,9 @@ begin
     FDrawBuffer.Height := 0;
     FBackground.Height := 0;
     FTarget.Height := 0;
-   {$IFDEF DELPHI_9_UP}// By Rapid D
     FDrawBuffer.SetSize(Width, Height);  // By Rapid D
     FBackground.SetSize(Width, Height);  // By Rapid D
     FTarget.SetSize(Width, Height);      // By Rapid D
-   {$ELSE DELPHI_9_dn}
-    FDrawBuffer.Width := Width;
-    FDrawBuffer.Height := Height;
-    FBackground.Width := Width;
-    FBackground.Height := Height;
-    FTarget.Width := Width;
-    FTarget.Height := Height;
-   {$ENDIF DELPHI_9_UP}// By Rapid D
 
     FHintData.Tree.Update;
 
@@ -5888,7 +5879,7 @@ begin
         else
         begin
           Canvas.Font := Tree.Font;
- {$IFDEF USE_VST}
+{$IFDEF USE_VST} // By Rapid D
           if Tree is TCustomVirtualStringTree then
             with TCustomVirtualStringTree(Tree) do
               DoPaintText(Node, Self.Canvas, Column, ttNormal);
@@ -6389,19 +6380,9 @@ begin
     FBackImage := TBitmap.Create;
     FBackImage.PixelFormat := pf32Bit;
 
-   {$IFDEF DELPHI_9_UP}// By Rapid D
     FDragImage.SetSize(Width, Height);  // By Rapid D
     FAlphaImage.SetSize(Width, Height);  // By Rapid D
     FBackImage.SetSize(Width, Height);  // By Rapid D
-   {$ELSE DELPHI_9_dn}
-    FDragImage.Width := Width;
-    FDragImage.Height := Height;
-    FAlphaImage.Width := Width;
-    FAlphaImage.Height := Height;
-    FBackImage.Width := Width;
-    FBackImage.Height := Height;
-   {$ENDIF DELPHI_9_UP}// By Rapid D
-
 
     // Copy the given drag image and apply pre blend bias if required.
     if FPreBlendBias = 0 then
@@ -9375,6 +9356,8 @@ var
             with Header.Treeview do
             begin
               ColImageInfo.Images := GetCheckImageListFor(CheckImageKind);
+              if not Assigned(ColImageInfo.Images) then
+                ColImageInfo.Images := CustomCheckImages;
               ColImageInfo.Index := GetCheckImage(nil, FCheckType, FCheckState, IsEnabled);
               ColImageInfo.XPos := GlyphPos.X;
               ColImageInfo.YPos := GlyphPos.Y;
@@ -10984,13 +10967,7 @@ begin
   with Image do
   try
     PixelFormat := pf32Bit;
-   {$IFDEF DELPHI_9_UP}// By Rapid D
     SetSize(DragColumn.Width, FHeight);  // By Rapid D
-   {$ELSE DELPHI_9_dn}
-    Width := DragColumn.Width;
-    Height := FHeight;
-   {$ENDIF DELPHI_9_UP}// By Rapid D
-
 
     // Erase the entire image with the color key value, for the case not everything
     // in the image is covered by the header image.
@@ -11579,7 +11556,7 @@ begin
 
     Dummy := FAutoSizeIndex;
     WriteBuffer(Dummy, SizeOf(Dummy));
-    Dummy := FBackground;
+    Dummy := FBackgroundColor;
     WriteBuffer(Dummy, SizeOf(Dummy));
     Dummy := FHeight;
     WriteBuffer(Dummy, SizeOf(Dummy));
@@ -11634,7 +11611,7 @@ begin
       WriteBuffer(Dummy, SizeOf(Dummy));
       Dummy := Integer(FMinWidthPercent);
       WriteBuffer(Dummy, SizeOf(Dummy));
-    end
+    end;
   end;
 end;
  {$ENDIF USE_VT_SAVES}
@@ -13436,6 +13413,20 @@ begin
   Result := Assigned(Node) and (vsSelected in Node.States);
 end;
 
+function TBaseVirtualTree.GetSelectedData<T>: TArray<T>;
+var
+  lItem: PVirtualNode;
+  i: Integer;
+begin
+  SetLEngth(Result, Self.SelectedCount);
+  lItem := Self.GetFirstSelected;
+  for i := 0 to SelectedCount - 1 do
+  begin
+    Result[i] := Self.GetNodeData<T>(lItem);
+    lItem := Self.GetNextSelected(lItem);
+  end;
+end;
+
 //----------------------------------------------------------------------------------------------------------------------
 
 function TBaseVirtualTree.GetTopNode: PVirtualNode;
@@ -13992,6 +13983,8 @@ begin
     FSelectedHotMinusBM.Canvas.Draw(0, 0, FMinusBM);
     FHotPlusBM.Canvas.Draw(0, 0, FPlusBM);
     FSelectedHotPlusBM.Canvas.Draw(0, 0, FPlusBM);
+    if Assigned(FOnPrepareButtonImages) then
+      FOnPrepareButtonImages(Self, FPlusBM, FHotPlusBM, FSelectedHotPlusBM, FMinusBM, FHotMinusBM, FSelectedHotMinusBM, size);
   end
     else
       begin
@@ -14462,7 +14455,6 @@ var
   Child: PVirtualNode;
   Count: Integer;
   NewHeight: Integer;
-  lNodeHeight: Integer;
 begin
   if not (toReadOnly in FOptions.FMiscOptions) then
   begin
@@ -14477,12 +14469,12 @@ begin
       if NewChildCount <> Node.ChildCount then
       begin
         InterruptValidation;
-        NewHeight := 0;
 
         if NewChildCount > Node.ChildCount then
         begin
           Remaining := NewChildCount - Node.ChildCount;
           Count := Remaining;
+          NewHeight := Node.TotalHeight;
 
           // New nodes to add.
           if Assigned(Node.LastChild) then
@@ -14493,6 +14485,8 @@ begin
             Include(Node.States, vsHasChildren);
           end;
           Node.States := Node.States - [vsAllChildrenHidden, vsHeightMeasured];
+          if (vsExpanded in Node.States) and FullyVisible[Node] then
+            Inc(FVisibleCount, Count); // Do this before a possible init of the sub-nodes in DoMeasureItem()
 
           // New nodes are by default always visible, so we don't need to check the visibility.
           while Remaining > 0 do
@@ -14510,20 +14504,12 @@ begin
             Inc(Index);
 
             if (toVariableNodeHeight in FOptions.FMiscOptions) then
-            begin
-              lNodeHeight := Child.NodeHeight;
-              DoMeasureItem(Canvas, Child, lNodeHeight);
-              Child.NodeHeight := lNodeHeight;
-            end;
-            Inc(NewHeight, Child.NodeHeight);
+              GetNodeHeight(Child);
+            Inc(NewHeight, Child.TotalHeight);
           end;
 
           if vsExpanded in Node.States then
-          begin
-            AdjustTotalHeight(Node, NewHeight, True);
-            if FullyVisible[Node] then
-              Inc(Integer(FVisibleCount), Count);
-          end;
+            AdjustTotalHeight(Node, NewHeight, False);
 
           AdjustTotalCount(Node, Count, True);
           Node.ChildCount := NewChildCount;
@@ -14531,7 +14517,7 @@ begin
             Sort(Node, FHeader.FSortColumn, FHeader.FSortDirection, True);
 
           InvalidateCache;
-        end
+        end//if NewChildCount > Node.ChildCount
         else
         begin
           // Nodes have to be deleted.
@@ -14554,6 +14540,8 @@ begin
           StructureChange(nil, crChildAdded)
         else
           StructureChange(Node, crChildAdded);
+
+        ReinitNode(Node, True);
       end;
     end;
   end;
@@ -14802,6 +14790,9 @@ begin
       Include(Node.States, vsFiltered);
       if not (toShowFilteredNodes in FOptions.FPaintOptions) then
       begin
+        if vsInitializing in Node.States then
+          AdjustTotalHeight(Node, 0, False)
+        else
         AdjustTotalHeight(Node, -Integer(NodeHeight[Node]), True);
         if FullyVisible[Node] then
         begin
@@ -16463,7 +16454,7 @@ end;
 procedure TBaseVirtualTree.WMGetObject(var Message: TMessage);
 
 begin
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if TVTAccessibilityFactory.GetAccessibilityFactory <> nil then
   begin
     // Create the IAccessibles for the tree view and tree view items, if necessary.
@@ -19386,7 +19377,7 @@ procedure TBaseVirtualTree.DoChecked(Node: PVirtualNode);
 begin
   if Assigned(FOnChecked) then
     FOnChecked(Self, Node);
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
  {$ENDIF MSAASupport}
@@ -19418,8 +19409,7 @@ var
 begin
   if Assigned(FOnCollapsed) then
     FOnCollapsed(Self, Node);
-
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
  {$ENDIF MSAASupport}
@@ -19810,7 +19800,7 @@ begin
   if Assigned(FOnExpanded) then
     FOnExpanded(Self, Node);
 
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_STATECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
  {$ENDIF MSAASupport}
@@ -19833,8 +19823,7 @@ procedure TBaseVirtualTree.DoFocusChange(Node: PVirtualNode; Column: TColumnInde
 begin
   if Assigned(FOnFocusChanged) then
     FOnFocusChanged(Self, Node, Column);
-
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if Assigned(FAccessibleItem) then
   begin
     NotifyWinEvent(EVENT_OBJECT_LOCATIONCHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
@@ -21454,6 +21443,8 @@ end;
 procedure TBaseVirtualTree.EnsureNodeFocused();
 begin
   if FocusedNode = nil then
+    FocusedNode := Self.GetFirstSelected();
+  if FocusedNode = nil then
     FocusedNode := Self.GetFirstVisible();
 end;
 
@@ -22747,52 +22738,63 @@ procedure TBaseVirtualTree.InitNode(Node: PVirtualNode);
 
 var
   InitStates: TVirtualNodeInitStates;
+  MustAdjustInternalVariables: Boolean;
 
 begin
   with Node^ do
   begin
-    InitStates := [];
-    if vsInitialized in States then
-      Include(InitStates, ivsReInit);
-    Include(States, vsInitialized);
-    if Parent = FRoot then
-      DoInitNode(nil, Node, InitStates)
-    else
-      DoInitNode(Parent, Node, InitStates);
-    if ivsDisabled in InitStates then
-      Include(States, vsDisabled);
-    if ivsHasChildren in InitStates then
-      Include(States, vsHasChildren);
-    if ivsSelected in InitStates then
-    begin
-      FSingletonNodeArray[0] := Node;
-      InternalAddToSelection(FSingletonNodeArray, 1, False);
-    end;
-    if ivsMultiline in InitStates then
-      Include(States, vsMultiline);
-    if ivsFiltered in InitStates then
-    begin
-      Include(States, vsFiltered);
-      if not (toShowFilteredNodes in FOptions.FPaintOptions) then
+    Include(States, vsInitializing);
+    try
+      InitStates := [];
+      if vsInitialized in States then
+        Include(InitStates, ivsReInit);
+      Include(States, vsInitialized);
+      if Parent = FRoot then
+        DoInitNode(nil, Node, InitStates)
+      else
+        DoInitNode(Parent, Node, InitStates);
+      if ivsDisabled in InitStates then
+        Include(States, vsDisabled);
+      if ivsHasChildren in InitStates then
+        Include(States, vsHasChildren);
+      if ivsSelected in InitStates then
       begin
-        AdjustTotalHeight(Node, -NodeHeight, True);
-        if FullyVisible[Node] then
-          Dec(FVisibleCount);
-        UpdateScrollBars(True);
+        FSingletonNodeArray[0] := Node;
+        InternalAddToSelection(FSingletonNodeArray, 1, False);
       end;
+      if ivsMultiline in InitStates then
+        Include(States, vsMultiline);
+      if ivsFiltered in InitStates then
+      begin
+        MustAdjustInternalVariables := not ((ivsReInit in InitStates) and (vsFiltered in States));
+
+        Include(States, vsFiltered);
+
+        if not (toShowFilteredNodes in FOptions.FPaintOptions) and MustAdjustInternalVariables then
+        begin
+          AdjustTotalHeight(Node, -NodeHeight, True);
+          if FullyVisible[Node] then
+            Dec(FVisibleCount);
+          if FUpdateCount = 0 then
+            UpdateScrollBars(True);
+        end;
+      end;
+
+      // Expanded may already be set (when called from ReinitNode) or be set in DoInitNode, allow both.
+      if (vsExpanded in Node.States) xor (ivsExpanded in InitStates) then
+      begin
+        // Expand node if not yet done (this will automatically initialize child nodes).
+        if ivsExpanded in InitStates then
+          ToggleNode(Node)
+        else
+          // If the node already was expanded then explicitly trigger child initialization.
+          if vsHasChildren in Node.States then
+            InitChildren(Node);
+      end;
+    finally
+      Exclude(States, vsInitializing);
     end;
 
-    // Expanded may already be set (when called from ReinitNode) or be set in DoInitNode, allow both.
-    if (vsExpanded in Node.States) xor (ivsExpanded in InitStates) then
-    begin
-      // Expand node if not yet done (this will automatically initialize child nodes).
-      if ivsExpanded in InitStates then
-        ToggleNode(Node)
-      else
-        // If the node already was expanded then explicitly trigger child initialization.
-        if vsHasChildren in Node.States then
-          InitChildren(Node);
-    end;
   end;
 end;
 
@@ -23388,8 +23390,7 @@ procedure TBaseVirtualTree.MainColumnChanged;
 
 begin
   DoCancelEdit;
-
- {$IFDEF MSAASupport}
+{$IFDEF MSAASupport} // By Rapid D
   if Assigned(FAccessibleItem) then
     NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, Handle, OBJID_CLIENT, CHILDID_SELF);
  {$ENDIF MSAASupport}
@@ -30285,8 +30286,8 @@ begin
               else
               begin
                 SetCanvasOrigin(PaintInfo.Canvas, -TargetRect.Left + Window.Left, -TargetRect.Top);
-                ClipCanvas(PaintInfo.Canvas, Rect(TargetRect.Left, TargetRect.Top, TargetRect.Right,
-                                                  Min(TargetRect.Bottom, MaximumBottom)));
+                ClipCanvas(PaintInfo.Canvas, Rect(0, 0, TargetRect.Right - TargetRect.Left,
+                                                  Min(TargetRect.Bottom - TargetRect.Top, MaximumBottom - TargetRect.Top))); // See issue #579
               end;
 
               // Set the origin of the canvas' brush. This depends on the node heights.
@@ -30450,7 +30451,7 @@ begin
                             begin
                               // These variables and the nested if conditions shall make the logic
                               // easier to understand.
-                              CellIsTouchingClientRight := PaintInfo.CellRect.Right = Window.Right;
+                              CellIsTouchingClientRight := PaintInfo.CellRect.Right = ClientRect.Right;
                               CellIsInLastColumn := Position = TColumnPosition(Count - 1);
                               ColumnIsFixed := coFixed in FHeader.FColumns[Column].Options;
 
@@ -30599,13 +30600,8 @@ begin
             // Avoid unnecessary copying of bitmap content. This will destroy the DC handle too.
             NodeBitmap.Height := 0;
             NodeBitmap.PixelFormat := pf32Bit;
-         {$IFDEF DELPHI_9_UP}// By Rapid D
           NodeBitmap.SetSize(TargetRect.Right - TargetRect.Left,
                          TargetRect.Bottom - TargetRect.Top); // By Rapid D
-         {$ELSE DELPHI_9_dn}
-            NodeBitmap.Width := TargetRect.Right - TargetRect.Left;
-            NodeBitmap.Height := TargetRect.Bottom - TargetRect.Top;
-         {$ENDIF DELPHI_9_UP}// By Rapid D
           end;
 
           // Call back application/descendants whether they want to erase this area.
@@ -30862,7 +30858,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-{$IFDEF USE_PRINT}
+{$IFDEF USE_PRINT} // By Rapid D
 procedure TBaseVirtualTree.Print(Printer: TPrinter; PrintHeader: Boolean);
 
 var
@@ -31305,7 +31301,8 @@ begin
   begin
     // Remove dynamic styles.
     Node.States := Node.States - [vsChecking, vsCutOrCopy, vsDeleting, vsHeightMeasured];
-    InitNode(Node);
+    if vsInitialized in Node.States then
+      InitNode(Node);
   end;
 
   if Recursive then
@@ -32403,9 +32400,7 @@ procedure TBaseVirtualTree.UpdateVerticalRange;
 
 begin
   // Total node height includes the height of the invisible root node.
-  if FRoot.TotalHeight < FDefaultNodeHeight then
-    FRoot.TotalHeight := FDefaultNodeHeight;
-  FRangeY := FRoot.TotalHeight - FRoot.NodeHeight + FBottomSpace;
+  FRangeY := Cardinal(Int64(FRoot.TotalHeight) - FRoot.NodeHeight + FBottomSpace);
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -32527,7 +32522,7 @@ begin
 end;
 
 //----------------- TCustomStringTreeOptions ---------------------------------------------------------------------------
- {$IFDEF USE_VST}
+{$IFDEF USE_VST} // By Rapid D
 
 constructor TCustomStringTreeOptions.Create(AOwner: TBaseVirtualTree);
 
@@ -34037,7 +34032,7 @@ var
 begin
   if Length(S) = 0 then
     S := Text[Node, Column];
-  DrawFormat := DT_TOP or DT_NOPREFIX or DT_CALCRECT or DT_WORDBREAK;
+
   if Column <= NoColumn then
   begin
     BidiMode := Self.BidiMode;
@@ -34051,6 +34046,12 @@ begin
 
   if BidiMode <> bdLeftToRight then
     ChangeBidiModeAlignment(Alignment);
+
+  if vsMultiline in Node.States then
+    DrawFormat := DT_NOPREFIX or DT_TOP or DT_WORDBREAK or DT_EDITCONTROL
+  else
+    DrawFormat := DT_NOPREFIX or DT_VCENTER or DT_SINGLELINE;
+  DrawFormat := DrawFormat or DT_CALCRECT;
 
   // Allow for autospanning.
   PaintInfo.Node := Node;
