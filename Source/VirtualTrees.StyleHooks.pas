@@ -1148,5 +1148,11 @@ initialization
 {$ENDIF USE_VST} // By Rapid D
   TCustomStyleEngine.RegisterStyleHook(TVirtualDrawTree, TVclStyleScrollBarsHook);
 
+finalization
+{$IFDEF USE_VST} // By Rapid D
+  TCustomStyleEngine.UnRegisterStyleHook(TVirtualStringTree, TVclStyleScrollBarsHook);
+{$ENDIF USE_VST} // By Rapid D
+  TCustomStyleEngine.UnRegisterStyleHook(TVirtualDrawTree, TVclStyleScrollBarsHook);
+
 end.
 
