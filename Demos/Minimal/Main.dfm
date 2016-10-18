@@ -9,7 +9,7 @@ object MainForm: TMainForm
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
-  Font.Name = 'MS Sans Serif'
+  Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
   ParentBiDiMode = False
@@ -41,14 +41,13 @@ object MainForm: TMainForm
     Header.Font.Charset = DEFAULT_CHARSET
     Header.Font.Color = clWindowText
     Header.Font.Height = -11
-    Header.Font.Name = 'MS Sans Serif'
+    Header.Font.Name = 'Tahoma'
     Header.Font.Style = []
     Header.MainColumn = -1
     Header.Options = [hoColumnResize, hoDrag]
     HintAnimation = hatNone
     IncrementalSearch = isAll
     ParentBiDiMode = False
-    RootNodeCount = 100
     TabOrder = 0
     TreeOptions.AnimationOptions = [toAnimatedToggle]
     TreeOptions.AutoOptions = [toAutoDropExpand, toAutoTristateTracking]
@@ -57,7 +56,6 @@ object MainForm: TMainForm
     TreeOptions.SelectionOptions = [toMultiSelect, toCenterScrollIntoView]
     OnFreeNode = VSTFreeNode
     OnInitNode = VSTInitNode
-    OnStartDrag = VSTStartDrag
     Columns = <>
   end
   object ClearButton: TButton

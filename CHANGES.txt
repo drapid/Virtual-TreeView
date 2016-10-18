@@ -1,3 +1,33 @@
+V6.41: (under developement)
+  * Fixed #661: Minimal Demo 2 different problems, can't select on start up, multiple clicks causes error
+
+V6.4: (28 Sep 2016)
+  * Fixed #622: [BREAKING CHANGE] Removed all 16x16 fixed sized checkbox-imagelists. 
+    The property CheckImageKind supports the values ckSystemDefault and ckCustom only and should be considered deprecated.
+  * Fixed #640: Edit control for in-place editing wrongly scaled in high-dpi scenarios
+  * Fixed #627: It should be possible to use OnGetImageIndexEx without having imagelists assigned
+  * Added assertion that verifies if an imageindex is supplied but no valid imagelist is available for this imageindex
+  * Fixed #148: Background Images now support other formats than just bitmaps.
+  * Fixed #623: GetHint calculates wrong width for HintText   
+  * Fixed #633: High dpi scaling was performed two times    
+  * Fixed #544, #427: Header painting problem with BiDiMode right to left
+  * TBaseVirtualTree.EnsureNodeSelected() only scrolls the selected node into the view, if no one was previously selected.    
+  * Fixed #248: VT Header draws smudged
+  * Fixed #643: VT Header dropmark appears even if dragged column won't change position
+  * Fixed #310: Incorrect selection paint when toAutoSpanColumns, toGridExtensions and toExtendedFocus are set
+  * Fixed #653: GetFirstVisibleChild/NoInit check for wrong node if IncludeFiltered=True (thx to A. Hausladen)
+  * Fixed #659: GetLastVisibleChild/NoInit checks wrong node
+  * Fixed #647: New option to set the way of selecting next cell for editing in grid mode
+  * Fixed #645: Can't link 64 bit VCL app with VirtualTreeView in C++ Builder 10.1 Berlin    
+  * Fixed #656: Fixed memory leaks in Advanced Demo
+  * Enhancement #631: Added new Demo project CharityEvents to demonstrate the use of Interfaces for node's data and for data presentation
+  * Fixed #658: Column Header does not paint correctly after a drop in certain conditions
+  * Fixed #639: Scrolbars are not correctly themed under certain cirumstances when using a VCL theme.
+  * Fixed #624: Wrong y-postion of checkboxes in high-dpi display mode  
+  * Fixed #548: Add flag coStyleColor to TVirtualTreeColumn.Options (prefer background color of VCL style over TVirtualTreeColumn.Color)
+  * Fixed #660: Fix AV when tree is modified in OnEdited event   
+  * Some minor tweaks on Virtual TreeView source code and sample projects
+  
 V6.3: (17 May 2016)
   * Added support for RAD Studio 10.1 Berlin
   * Implemented #607: Disabled checkbox images should be available 

@@ -40,8 +40,6 @@ uses
   Vcl.Themes,
   Vcl.Controls;
 
-const
-  CM_UPDATE_VCLSTYLE_SCROLLBARS = CM_BASE + 2050;
 
 type
   // XE2+ VCL Style
@@ -88,7 +86,6 @@ type
     FVertScrollBarUpButtonState: TThemedScrollBar;
     FVertScrollBarWindow: TVclStyleScrollBarWindow;
 
-    procedure CMUpdateVclStyleScrollbars(var Message: TMessage); message CM_UPDATE_VCLSTYLE_SCROLLBARS;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
     procedure WMKeyDown(var Msg: TMessage); message WM_KEYDOWN;
     procedure WMKeyUp(var Msg: TMessage); message WM_KEYUP;
@@ -565,17 +562,11 @@ begin
   Handled := True;
 end;
 
-procedure TVclStyleScrollBarsHook.CMUpdateVclStyleScrollbars
-  (var Message: TMessage);
-begin
-  CalcScrollBarsRect;
-  PaintScrollBars;
-end;
-
 procedure TVclStyleScrollBarsHook.WMKeyDown(var Msg: TMessage);
 begin
   CallDefaultProc(TMessage(Msg));
-  PaintScrollBars;
+  CalcScrollBarsRect;
+  UpdateScrollBarWindow;
   Handled := True;
 end;
 
@@ -589,7 +580,8 @@ end;
 procedure TVclStyleScrollBarsHook.WMLButtonDown(var Msg: TWMMouse);
 begin
   CallDefaultProc(TMessage(Msg));
-  PaintScrollBars;
+  CalcScrollBarsRect;
+  UpdateScrollBarWindow;
   Handled := True;
 end;
 
