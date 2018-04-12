@@ -30,6 +30,7 @@ interface
 
 uses
   Winapi.Windows,
+  Winapi.ActiveX,
   System.Types,
   Vcl.Graphics,
   Vcl.ImgList;
@@ -63,7 +64,6 @@ procedure DrawImage(ImageList: TCustomImageList; Index: Integer; Canvas: TCanvas
 // Adjusts the given string S so that it fits into the given width. EllipsisWidth gives the width of
 // the three points to be added to the shorted string. If this value is 0 then it will be determined implicitely.
 // For higher speed (and multiple entries to be shorted) specify this value explicitely.
-// Note: It is assumed that the string really needs shortage. Check this in advance.
 function ShortenString(DC: HDC; const S: string; Width: Integer; EllipsisWidth: Integer = 0): string;
 
 // Wrap the given string S so that it fits into a space of given width.
@@ -80,19 +80,57 @@ function OrderRect(const R: TRect): TRect;
 // (used in DragMove of the drag manager and DragTo of the header columns).
 procedure FillDragRectangles(DragWidth, DragHeight, DeltaX, DeltaY: Integer; var RClip, RScroll, RSamp1, RSamp2, RDraw1, RDraw2: TRect);
 
-procedure SetCurrentThreadName(const Name: Ansistring); // By Rapid D
+// Attaches a bitmap as drag image to an IDataObject, see issue #405
+// Usage: Set property DragImageKind to diNoImage, in your event handler OnCreateDataObject
+//        call VirtualTrees.Utils.ApplyDragImage() with your `IDataObject` and your bitmap.
+procedure ApplyDragImage(const pDataObject: IDataObject; pBitmap: TBitmap);
+
+/// Returns Tree if the mouse cursor is currently visible and False in case it is suppressed.
+/// Useful when doing hot-tracking on touchscreens, see issue #766
+function IsMouseCursorVisible(): Boolean;
 
 
 implementation
 
 uses
   Winapi.CommCtrl,
+  Winapi.ShlObj,
   System.SysUtils,
   System.StrUtils,
   System.Math;
 
 const
   WideLF = Char(#10);
+
+procedure ApplyDragImage(const pDataObject: IDataObject; pBitmap: TBitmap);
+var
+  DragSourceHelper: IDragSourceHelper;
+  DragInfo: SHDRAGIMAGE;
+  lDragSourceHelper2: IDragSourceHelper2;// Needed to get Windows Vista+ style drag hints.
+  lNullPoint: TPoint;
+begin
+
+  if Assigned(pDataObject) and Succeeded(CoCreateInstance(CLSID_DragDropHelper, nil, CLSCTX_INPROC_SERVER,
+    IID_IDragSourceHelper, DragSourceHelper)) then
+  begin
+    if Supports(DragSourceHelper, IDragSourceHelper2, lDragSourceHelper2) then
+      lDragSourceHelper2.SetFlags(DSH_ALLOWDROPDESCRIPTIONTEXT);// Show description texts
+    if not Succeeded(DragSourceHelper.InitializeFromWindow(0, lNullPoint, pDataObject)) then begin   // First let the system try to initialze the DragSourceHelper, this works fine e.g. for file system objects
+      // Create drag image
+
+      if not Assigned(pBitmap) then
+        Exit();
+      DragInfo.crColorKey := clBlack;
+      DragInfo.sizeDragImage.cx := pBitmap.Width;
+      DragInfo.sizeDragImage.cy := pBitmap.Height;
+      DragInfo.ptOffset.X := pBitmap.Width div 8;
+      DragInfo.ptOffset.Y := pBitmap.Height div 10;
+      DragInfo.hbmpDragImage := CopyImage(pBitmap.Handle, IMAGE_BITMAP, pBitmap.Width, pBitmap.Height, LR_COPYRETURNORG);
+      if not Succeeded(DragSourceHelper.InitializeFromBitmap(@DragInfo, pDataObject)) then
+        DeleteObject(DragInfo.hbmpDragImage);
+    end;//if not InitializeFromWindow
+  end;
+end;
 
 
 function OrderRect(const R: TRect): TRect;
@@ -1287,39 +1325,17 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-
-{
-  function IfThen(AValue: Boolean; const ATrue: Integer; const AFalse: Integer = 0): Integer;
-  begin
-    if AValue then
-      Result := ATrue
-    else
-      Result := AFalse;
-  end;
-}
-procedure SetCurrentThreadName(const Name: Ansistring); // By Rapid D
-type
-  TThreadNameInfo =
-    record
-      RecType: LongWord;
-      Name: PAnsiChar;
-      ThreadID: LongWord;
-      Flags: LongWord;
-    end;
+function IsMouseCursorVisible(): Boolean;
 var
-  info:TThreadNameInfo;
+  CI: TCursorInfo;
 begin
-  // This code is extremely strange, but it's the documented way of doing it!
-  info.RecType:=$1000;
-  info.Name:=PAnsiChar(Name);
-  info.ThreadID:=$FFFFFFFF;
-  info.Flags:=0;
-  try
-    RaiseException($406D1388, 0,
-      SizeOf(info) div SizeOf(LongWord), PUINT_PTR(@info));
-//      SizeOf(info) div SizeOf(LongWord), PDWORD(@info));
-  except
-  end;
+  CI.cbSize := SizeOf(CI);
+  Result := GetCursorInfo(CI) and (CI.flags = CURSOR_SHOWING);
+  // 0                     Hidden
+  // CURSOR_SHOWING (1)    Visible
+  // CURSOR_SUPPRESSED (2) Touch/Pen Input (Windows 8+)
+  // https://msdn.microsoft.com/en-us/library/windows/desktop/ms648381(v=vs.85).aspx
 end;
+
 
 end.
