@@ -102,11 +102,6 @@ object AlignForm: TAlignForm
     EditDelay = 100
     Header.AutoSizeIndex = 0
     Header.Background = clBtnShadow
-    Header.Font.Charset = ANSI_CHARSET
-    Header.Font.Color = clWindowText
-    Header.Font.Height = -12
-    Header.Font.Name = 'Arial'
-    Header.Font.Style = [fsBold]
     Header.Height = 40
     Header.Images = HeaderImages
     Header.Options = [hoColumnResize, hoDblClickResize, hoDrag, hoShowHint, hoShowImages, hoShowSortGlyphs, hoVisible, hoAutoSpring]
@@ -127,6 +122,7 @@ object AlignForm: TAlignForm
     TreeOptions.SelectionOptions = [toExtendedFocus, toMultiSelect]
     OnFocusChanged = AlignTreeFocusChanged
     OnFreeNode = AlignTreeFreeNode
+    OnGetText = AlignTreeGetText
     OnPaintText = AlignTreePaintText
     OnGetImageIndex = AlignTreeGetImageIndex
     OnGetNodeDataSize = AlignTreeGetNodeDataSize
@@ -335,7 +331,7 @@ object AlignForm: TAlignForm
     Left = 554
     Top = 212
     Bitmap = {
-      494C010102000400080010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
+      494C010102000400100010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000001000000001002000000000000010
       000000000000000000000000000000000000FFFFFF00FFFFFF00FFFFFF00FFFF
       FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFF
@@ -480,7 +476,7 @@ object AlignForm: TAlignForm
     Left = 556
     Top = 244
     Bitmap = {
-      494C010141004500080020002000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
+      494C010141004500100020002000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000800000002002000001002000000000000040
       0400000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
